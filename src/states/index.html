@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>D3.js GoogleMap States Diagram</title>
+    <script src="http://d3js.org/d3.v3.js"></script>
+    <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
+    <style type="text/css">
+        html, body{
+            margin: 0px;
+            padding: 0px;
+        }
+        html, body, #map_canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .SvgOverlay {
+            position: relative;
+            width: 900px;
+            height: 600px;
+        }
+
+        .SvgOverlay svg {
+            position: absolute;
+            top: -4000px;
+            left: -4000px;
+            width: 8000px;
+            height: 8000px;
+        }
+
+    </style>
+</head>
+<body>
+<div id="map_canvas"></div>
+<br>
+
+<script type="text/javascript">
+
+    //d3.json('./us_states_arizona.json', function(statesGeo){
+    d3.json('./us_states_simple.json', function(statesGeo){
+        main(statesGeo);
+    });
+
+    function main(statesGeo) {
+
+        var map = new google.maps.Map(document.getElementById('map_canvas'), {
+            zoom: 4,
+            mapTypeId: google.maps.MapTypeId.ROADMAP,
+            center: new google.maps.LatLng(49.2742999, -100.953057),
+        });
+        
+        var projectionCounter = 0;
+
+        var overlay = new google.maps.OverlayView();
+
+        overlay.onAdd = function () {
+            var layer = d3.select(this.getPanes().overlayMouseTarget).append("div").attr("class", "SvgOverlay");
+            var svg = layer.append("svg");
+            var svgOverlay = svg.append("g").attr("class", "AdminDivisions");
+
+            var previousZoom = undefined;
+
+            overlay.draw = function () {
+                console.log("draw");
+                projectionCounter = 0;
+                var markerOverlay = this;
+                var overlayProjection = markerOverlay.getProjection();
+                var zoomChanged = previousZoom !== map.getZoom();
+
+                var googleMapProjection = function (coordinates) {
+                    projectionCounter++;
+                    //console.log("convert " + coordinates);
+                    var googleCoordinates = new google.maps.LatLng(coordinates[1], coordinates[0]);
+                    var pixelCoordinates = overlayProjection.fromLatLngToDivPixel(googleCoordinates);
+                    //console.log("to " + pixelCoordinates);
+                    return [pixelCoordinates.x + 4000, pixelCoordinates.y + 4000];
+                }
+
+                var polygons = statesGeo.features;
+
+                var path = d3.geo.path().projection(googleMapProjection);
+
+                var regions = svgOverlay.selectAll("path")
+                        .data(polygons);
+
+                if (zoomChanged) {
+                    // update existing region only if zoom changed
+                    regions.attr("d", path);
+                };
+
+                regions.enter().append("path")
+                        .attr("d", path)
+                        .style("fill", function() { return "#44aaee" })
+                        .on("mouseover", function(e){d3.select(this).style("fill", "#5522aa")})
+                        .on("mouseout", function(e){d3.select(this).style("fill", "#44aaee")});
+                
+                console.log("made " + projectionCounter + " projections");
+
+                previousZoom = map.getZoom();
+            };
+
+        };
+
+        //作成したSVGを地図にオーバーレイする
+        overlay.setMap(map);
+
+
+    };
+
+</script>
+
+</body>
+</html>
